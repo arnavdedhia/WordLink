@@ -80,6 +80,7 @@ class CaptureManager:
         self._debug = False
         self._source_status: SourceStatus | None = None
         self._settle_started: float | None = None
+        self.last_stabilize_ms = 0.0
 
     # ----- control -------------------------------------------------------
 
@@ -158,7 +159,11 @@ class CaptureManager:
                 self._settle_started = now
             return
 
+        stabilize_ms = 0.0
+        if self._settle_started is not None:
+            stabilize_ms = (time.monotonic() - self._settle_started) * 1000
         self._settle_started = None
+        self.last_stabilize_ms = stabilize_ms
         if observed.phase is BoardPhase.UNCHANGED:
             self._set_phase("watching")
             with self._lock:

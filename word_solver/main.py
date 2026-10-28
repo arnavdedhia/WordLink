@@ -52,13 +52,14 @@ def print_report(board: Board, result: SolveResult, config: SolverConfig) -> Non
     for best in result.best_words:
         print(f"  {best.word}")
         print(f"    Length: {best.length}")
+        print(f"    Points: {best.score}  (letters {best.letter_score} + length bonus {best.length_bonus})")
         print(f"    Path:   {format_path(best)}")
     print()
 
     top = result.top(config.top_n)
-    print(f"Top {len(top)} longest words:")
+    print(f"Top {len(top)} highest-scoring words:")
     for i, item in enumerate(top, start=1):
-        print(f"  {i:>2}. {item.word:<16} ({item.length})  {format_path(item)}")
+        print(f"  {i:>2}. {item.word:<16} {item.score:>5} pts  ({item.length})  {format_path(item)}")
     print()
 
     print(f"Total valid words found: {result.total}")

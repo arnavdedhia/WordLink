@@ -218,7 +218,8 @@ class TestSolverIntegration(unittest.TestCase):
             board = board_from_screenshot(SCREENSHOT, debug=False, accept_uncertain=False)
         self.assertEqual(board, EXPECTED)
         result = Solver(WordDictionary(["FOUND", "TOUPEES", "DEPUTES"]).build_trie(3)).solve(board)
-        self.assertEqual([w.word for w in result.best_words], ["DEPUTES", "TOUPEES"])
+        self.assertEqual([w.word for w in result.words], ["DEPUTES", "TOUPEES", "FOUND"])
+        self.assertEqual([w.word for w in result.best_words], ["DEPUTES"])
 
 
 if __name__ == "__main__":

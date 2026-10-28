@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from word_solver.config import DEFAULT_CONFIG
-from word_solver.dictionary import WordDictionary, append_word, normalize_word, read_word_file
+from word_solver.dictionary import BlockedWordList, WordDictionary, append_word, normalize_word, read_word_file
 from word_solver.tests.helpers import found_words, make_board, solve
 
 
@@ -73,6 +73,32 @@ class TestWordDictionary(unittest.TestCase):
             self.assertEqual(path.read_text(encoding="utf-8").count("YOYO"), 1)
             with self.assertRaises(ValueError):
                 append_word(path, "bad word")
+
+
+class TestBlockedWordList(unittest.TestCase):
+    def test_add_is_idempotent_and_does_not_reread(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "blocked.txt"
+            blocked = BlockedWordList(path)
+            word, added, _ms = blocked.add(" example ")
+            self.assertEqual(word, "EXAMPLE")
+            self.assertTrue(added)
+            word, added, _ms = blocked.add("EXAMPLE")
+            self.assertFalse(added)
+            self.assertEqual(path.read_text(encoding="utf-8").count("EXAMPLE"), 1)
+            self.assertIn("EXAMPLE", blocked)
+
+    def test_remove_rewrites_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "blocked.txt"
+            path.write_text("# header\nFOO\nBAR\n", encoding="utf-8")
+            blocked = BlockedWordList(path)
+            self.assertEqual(blocked.remove("foo"), "FOO")
+            self.assertNotIn("FOO", blocked)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("# header", text)
+            self.assertNotIn("FOO", text)
+            self.assertIn("BAR", text)
 
 
 class TestSolverDictionaryValidation(unittest.TestCase):

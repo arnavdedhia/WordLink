@@ -48,16 +48,27 @@
 
       <div id="hero" class="hero">
         <div class="hero-row">
-          <span id="hero-label" class="hero-label">BEST WORD:</span>
+          <span id="hero-label" class="hero-label">BEST WORD</span>
+        </div>
+        <div class="hero-row">
           <span id="hero-word" class="hero-word"></span>
           <span id="unverified-tag" class="tag" hidden>UNVERIFIED</span>
         </div>
         <div class="hero-row small">
-          <span class="hero-label">LENGTH:</span>
+          <span class="hero-label">Length:</span>
           <span id="hero-length" class="hero-length"></span>
+          <span class="hero-label">Points:</span>
+          <span id="hero-score" class="hero-length"></span>
           <span id="hero-tied" class="muted" hidden></span>
-          <button id="back-to-best" class="link" type="button" hidden>Back to best word</button>
         </div>
+      </div>
+
+      <div class="play-actions">
+        <button id="reject-btn" class="button reject" type="button">WORD NOT ACCEPTED <span class="shortcut">X</span></button>
+        <button id="next-btn" class="button next-word" type="button">NEXT WORD <span class="shortcut">N</span></button>
+        <button id="undo-btn" class="button undo" type="button">Undo Last Rejection <span class="shortcut">Z</span></button>
+        <p id="suggestion-count" class="suggestion-count"></p>
+        <div id="next-preview" class="next-preview"></div>
       </div>
 
       <div id="board" class="board" aria-label="Board">
@@ -73,9 +84,6 @@
         <span id="edit-hint" class="edit-hint" hidden>Edit mode: tap a tile to change its letter</span>
       </div>
 
-      <h2>Next best words</h2>
-      <ol id="word-list" class="word-list"></ol>
-      <p id="no-words" class="muted" hidden></p>
     </section>
 
     <section class="right">

@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from word_solver.config import DEFAULT_CONFIG, SolverConfig
+from word_solver.config import DEFAULT_CONFIG, SolverConfig, word_score
 from word_solver.trie import Trie, TrieNode
 
 Board = Sequence[Sequence[str]]
@@ -20,14 +20,29 @@ Coordinate = list[int]  # [row, col], zero-based
 
 @dataclass
 class WordResult:
-    """A valid word and one board path that spells it."""
+    """A valid word, one board path that spells it, and its game score."""
 
     word: str
     length: int
     path: list[Coordinate]
+    letter_score: int = 0
+    length_bonus: int = 0
+    score: int = 0
+
+    @classmethod
+    def make(cls, word: str, path: list[Coordinate]) -> WordResult:
+        letters, bonus, total = word_score(word)
+        return cls(word, len(word), path, letters, bonus, total)
 
     def to_dict(self) -> dict:
-        return {"word": self.word, "length": self.length, "path": [list(p) for p in self.path]}
+        return {
+            "word": self.word,
+            "length": self.length,
+            "path": [list(p) for p in self.path],
+            "letter_score": self.letter_score,
+            "length_bonus": self.length_bonus,
+            "score": self.score,
+        }
 
 
 @dataclass
@@ -47,20 +62,16 @@ class SolveResult:
 
 
 def rank_key(result: WordResult) -> tuple:
-    """Sort key for results: longest first, then alphabetical.
-
-    Change this (and ``select_best``) to switch the game's objective,
-    e.g. to a point-based score.
-    """
-    return (-result.length, result.word)
+    """Sort key: highest score first, then longer words, then alphabetical."""
+    return (-result.score, -result.length, result.word)
 
 
 def select_best(ranked: list[WordResult]) -> list[WordResult]:
-    """Return every result tied with the top-ranked one (all longest words)."""
+    """Return every result tied for the highest score."""
     if not ranked:
         return []
-    best_length = ranked[0].length
-    return [r for r in ranked if r.length == best_length]
+    best_score = ranked[0].score
+    return [r for r in ranked if r.score == best_score]
 
 
 def normalize_board(board: Board, config: SolverConfig = DEFAULT_CONFIG) -> list[list[str]]:
@@ -134,11 +145,7 @@ class Solver:
         def dfs(cell: int, node: TrieNode, word: str, visited: int) -> None:
             path.append(cell)
             if node.is_word and len(word) >= min_len and word not in found:
-                found[word] = WordResult(
-                    word=word,
-                    length=len(word),
-                    path=[[i // cols, i % cols] for i in path],
-                )
+                found[word] = WordResult.make(word, [[i // cols, i % cols] for i in path])
             if max_len is None or len(word) < max_len:
                 for nxt in neighbors[cell]:
                     bit = 1 << nxt

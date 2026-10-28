@@ -27,6 +27,9 @@ class TestCoordinatePaths(unittest.TestCase):
                 "word": "FOUND",
                 "length": 5,
                 "path": [[3, 0], [2, 0], [3, 1], [3, 2], [3, 3]],
+                "letter_score": 9,
+                "length_bonus": 250,
+                "score": 259,
             },
         )
 
@@ -46,11 +49,22 @@ class TestCoordinatePaths(unittest.TestCase):
 
 
 class TestRanking(unittest.TestCase):
-    def test_longest_first_and_ties_all_returned(self):
+    def test_highest_score_first_and_score_ties_all_returned(self):
         board = [list("CATS"), list("DOGZ"), list("ZZZZ"), list("ZZZZ")]
         result = solve(board, ["CAT", "CATS", "DOGS", "DOG"])
+        # 4-letter words get +100, so they outrank 3-letter words. CATS/DOGS tie on score.
         self.assertEqual([r.word for r in result.words], ["CATS", "DOGS", "CAT", "DOG"])
         self.assertEqual([r.word for r in result.best_words], ["CATS", "DOGS"])
+        self.assertEqual(result.words[0].score, 106)
+        self.assertEqual(result.words[2].score, 5)
+
+    def test_seven_letter_bonus_outranks_shorter_high_letters(self):
+        from word_solver.config import word_score
+
+        self.assertEqual(word_score("CAT"), (5, 0, 5))
+        self.assertEqual(word_score("QUIZ"), (22, 100, 122))
+        self.assertEqual(word_score("DEPUTES"), (10, 1000, 1010))
+        self.assertGreater(word_score("DEPUTES")[2], word_score("QUIZ")[2])
 
 
 class TestSampleBoardWithRealDictionary(unittest.TestCase):

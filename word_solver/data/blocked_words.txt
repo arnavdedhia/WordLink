@@ -1,3 +1,18 @@
 # Words in words.txt that the game rejects.
 # One word per line. Lines starting with # are ignored.
 # Add from the command line with: python -m word_solver --block WORD
+TENACE
+DRAYAGE
+ORANGEY
+ANCONE
+CENOTE
+COSTAE
+NOSTOC
+OXEYES
+LUNCHER
+COULTER
+COURTER
+TURTLER
+OCHERY
+HURLEY
+GLEYED

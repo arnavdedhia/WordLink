@@ -61,8 +61,15 @@ def attach_iphone_capture(app: FastAPI, debug: bool = False) -> CaptureManager:
     from word_solver.capture.iphone_capture import IPhoneCapture
 
     def on_frame(image, name, capture_ms, debug_flag):
+        manager = getattr(app.state, "capture", None)
+        stabilize_ms = float(getattr(manager, "last_stabilize_ms", 0.0) or 0.0)
         return app.state.service.ingest_bgr(
-            image, name, origin="iphone", debug=debug_flag, capture_ms=capture_ms
+            image,
+            name,
+            origin="iphone",
+            debug=debug_flag,
+            capture_ms=capture_ms,
+            stabilize_ms=stabilize_ms,
         )
 
     source = IPhoneCapture()
@@ -118,6 +125,42 @@ def create_app(service: BoardService | None = None, capture: CaptureManager | No
             raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/current-board")
+    def current_board() -> dict:
+        return merge_state(app)
+
+    @app.post("/api/reject-current-word")
+    def reject_current_word() -> dict:
+        try:
+            extra = svc().reject_current()
+            data = merge_state(app)
+            data.update({k: extra[k] for k in ("rejected_word", "persist_ms", "switch_ms") if k in extra})
+            return data
+        except LookupError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.post("/api/next-word")
+    def next_word() -> dict:
+        try:
+            extra = svc().next_word()
+            data = merge_state(app)
+            if "switch_ms" in extra:
+                data["switch_ms"] = extra["switch_ms"]
+            return data
+        except LookupError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.post("/api/undo-rejection")
+    def undo_rejection() -> dict:
+        try:
+            extra = svc().undo_rejection()
+            data = merge_state(app)
+            if "undone_word" in extra:
+                data["undone_word"] = extra["undone_word"]
+            return data
+        except LookupError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.post("/api/capture/start")
     def capture_start(body: CaptureToggle | None = None) -> dict:

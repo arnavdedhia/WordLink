@@ -28,6 +28,45 @@ DIAGONAL_OFFSETS: tuple[tuple[int, int], ...] = (
 )
 ALL_OFFSETS = ORTHOGONAL_OFFSETS + DIAGONAL_OFFSETS
 
+# Game letter values (Scrabble-style).
+LETTER_POINTS: dict[str, int] = {
+    "A": 1, "E": 1, "I": 1, "O": 1, "U": 1, "L": 1, "N": 1, "S": 1, "T": 1, "R": 1,
+    "D": 2, "G": 2,
+    "B": 3, "C": 3, "M": 3, "P": 3,
+    "F": 4, "H": 4, "V": 4, "W": 4, "Y": 4,
+    "K": 5,
+    "J": 8, "X": 8,
+    "Q": 10, "Z": 10,
+}
+
+# Added on top of the sum of letter values.
+LENGTH_BONUS: dict[int, int] = {
+    3: 0,
+    4: 100,
+    5: 250,
+    6: 500,
+}
+LENGTH_BONUS_7_PLUS = 1000
+
+
+def letter_points(word: str) -> int:
+    """Sum of per-letter values. Unknown characters score 0."""
+    return sum(LETTER_POINTS.get(ch, 0) for ch in word.upper())
+
+
+def length_bonus(length: int) -> int:
+    """Bonus for word length. 7-letter and longer words get 1000."""
+    if length >= 7:
+        return LENGTH_BONUS_7_PLUS
+    return LENGTH_BONUS.get(length, 0)
+
+
+def word_score(word: str) -> tuple[int, int, int]:
+    """Return (letter_points, length_bonus, total)."""
+    letters = letter_points(word)
+    bonus = length_bonus(len(word))
+    return letters, bonus, letters + bonus
+
 
 @dataclass(frozen=True)
 class SolverConfig:

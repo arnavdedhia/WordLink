@@ -51,6 +51,7 @@ body {
   cursor: pointer;
 }
 .button:hover { border-color: #94a3b8; }
+.button:disabled { opacity: 0.45; cursor: default; }
 .button.primary { background: var(--mid); border-color: var(--mid); }
 .button[aria-pressed="true"] { background: var(--warn); border-color: var(--warn); color: #111; }
 .check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 16px; }
@@ -87,11 +88,48 @@ body {
 }
 .warning small { display: block; font-weight: 400; font-size: 16px; color: #fecaca; }
 
-.hero { margin-bottom: 16px; }
+.hero { margin-bottom: 12px; }
 .hero-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 14px; }
 .hero-label { color: var(--muted); font-size: 28px; font-weight: 700; }
 .hero-word { font-size: 64px; font-weight: 800; letter-spacing: 4px; line-height: 1.1; }
 .hero-row.small .hero-label, .hero-length { font-size: 28px; font-weight: 700; }
+
+.play-actions { display: grid; gap: 10px; margin: 0 0 18px; }
+.button.reject {
+  width: 100%;
+  padding: 22px 18px;
+  font-size: 28px;
+  letter-spacing: 1px;
+  background: var(--danger);
+  border-color: #b91c1c;
+}
+.button.reject:hover { border-color: #fecaca; }
+.button.next-word {
+  width: 100%;
+  padding: 16px 18px;
+  font-size: 22px;
+}
+.button.undo {
+  justify-self: start;
+  padding: 8px 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+}
+.shortcut {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.suggestion-count { margin: 4px 0 0; font-size: 20px; font-weight: 700; color: var(--muted); }
+.next-preview { color: var(--muted); font-size: 18px; line-height: 1.45; }
+.next-preview .label { font-weight: 700; margin-right: 8px; }
+.next-preview .alt { font-weight: 800; letter-spacing: 1px; color: var(--text); margin-right: 12px; }
 .hero.unverified .hero-word { color: #fca5a5; text-decoration: underline wavy var(--danger); }
 .tag { padding: 4px 10px; border-radius: 6px; background: var(--danger); font-size: 18px; font-weight: 800; }
 .tag.stale { background: var(--warn); color: #111; }

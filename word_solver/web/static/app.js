@@ -2,10 +2,8 @@
 
 // Every API call returns the full board state; render() redraws from it.
 let state = null;
-let selected = 0; // index into state.solve.words
 let editing = false;
 let editingCell = null; // [row, col] open in the dialog
-let lastBoardKey = "";
 
 const $ = (id) => document.getElementById(id);
 const SIZE = 4;
@@ -14,8 +12,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 // ----- API -----------------------------------------------------------------
 
-async function api(path, options = {}) {
-  showBusy(true);
+async function api(path, options = {}, { busy = true } = {}) {
+  if (busy) showBusy(true);
   try {
     const response = await fetch(path, options);
     const body = await response.json().catch(() => ({}));
@@ -26,8 +24,12 @@ async function api(path, options = {}) {
     showError(err.message);
     throw err;
   } finally {
-    showBusy(false);
+    if (busy) showBusy(false);
   }
+}
+
+function apiLocal(path) {
+  return api(path, { method: "POST" }, { busy: false });
 }
 
 async function uploadScreenshot(file) {
@@ -51,16 +53,16 @@ function jsonBody(data) {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) };
 }
 
-function setState(next, resetSelection) {
-  state = next;
-  if (resetSelection) selected = 0;
-  render();
-}
-
 function applyServerState(next) {
-  const key = next && next.loaded ? JSON.stringify(next.board) : "";
-  setState(next, key !== lastBoardKey);
-  lastBoardKey = key;
+  if (!next) return;
+  if (state && typeof next.update_seq === "number" && typeof state.update_seq === "number" && next.update_seq < state.update_seq) {
+    return;
+  }
+  if (state && next.board_id && state.board_id && next.board_id < state.board_id) {
+    return;
+  }
+  state = next;
+  render();
 }
 
 // ----- rendering -------------------------------------------------------------
@@ -72,14 +74,12 @@ function render() {
   $("content").hidden = !loaded;
   if (!loaded) return;
 
-  const words = state.solve ? state.solve.words : [];
-  if (selected >= words.length) selected = 0;
-  const current = words[selected] || null;
+  const current = state.current_suggestion || null;
 
   renderWarning();
   renderHero(current);
+  renderPlayActions(current);
   renderBoard(current);
-  renderWordList(words);
   renderStatus();
 }
 
@@ -132,13 +132,34 @@ function renderHero(current) {
   const hero = $("hero");
   hero.classList.toggle("unverified", !state.reliable);
   $("unverified-tag").hidden = state.reliable || !current;
-  $("hero-label").textContent = selected === 0 ? "BEST WORD:" : `WORD #${selected + 1}:`;
+  $("hero-label").textContent = "BEST WORD";
   $("hero-word").textContent = current ? current.word : state.solve ? "No words found" : "-";
   $("hero-length").textContent = current ? current.length : "-";
-  const tied = state.solve && selected === 0 && state.solve.best_count > 1;
+  $("hero-score").textContent = current && current.score != null ? current.score : "-";
+  const tied = state.solve && state.suggestion_index === 1 && state.solve.best_count > 1;
   $("hero-tied").hidden = !tied;
   $("hero-tied").textContent = tied ? `(tied with ${state.solve.best_count - 1} other word${state.solve.best_count === 2 ? "" : "s"})` : "";
-  $("back-to-best").hidden = selected === 0;
+}
+
+function renderPlayActions(current) {
+  const hasWords = !!(state.solve && state.total_suggestions);
+  $("reject-btn").disabled = !current;
+  $("next-btn").disabled = !current || !(state.next_suggestions && state.next_suggestions.length);
+  $("undo-btn").disabled = !state.can_undo;
+  $("suggestion-count").textContent = hasWords
+    ? `Suggestion ${state.suggestion_index} of ${state.total_suggestions}`
+    : "No suggestions";
+  const preview = $("next-preview");
+  const next = state.next_suggestions || [];
+  if (!next.length) {
+    preview.textContent = "";
+    return;
+  }
+  preview.innerHTML = '<span class="label">Next:</span>' + next.map((w) => `<span class="alt"></span>`).join("");
+  [...preview.querySelectorAll(".alt")].forEach((el, i) => {
+    const w = next[i];
+    el.textContent = w.score != null ? `${w.word} (${w.score})` : w.word;
+  });
 }
 
 function renderBoard(current) {
@@ -235,27 +256,6 @@ function svgEl(tag, attrs) {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
   return el;
-}
-
-function renderWordList(words) {
-  const list = $("word-list");
-  list.replaceChildren();
-  const next = words.slice(1, 11);
-  next.forEach((w, i) => {
-    const index = i + 1;
-    const li = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = index === selected ? "selected" : "";
-    button.innerHTML = `<span class="rank">${index + 1}.</span><span class="word"></span><span class="len">${w.length} letters</span>`;
-    button.querySelector(".word").textContent = w.word;
-    button.addEventListener("click", () => { selected = index; render(); });
-    li.appendChild(button);
-    list.appendChild(li);
-  });
-  const none = $("no-words");
-  none.hidden = next.length > 0;
-  none.textContent = state.solve ? "No other words found." : "Fix the unreadable tiles to see words.";
 }
 
 function renderStatus() {
@@ -373,7 +373,29 @@ $("type-form").addEventListener("submit", (e) => {
   submitBoard($("type-input").value).then(() => { $("type-form").hidden = true; }).catch(() => {});
 });
 
-$("back-to-best").addEventListener("click", () => { selected = 0; render(); });
+$("reject-btn").addEventListener("click", () => {
+  apiLocal("/api/reject-current-word").then(applyServerState).catch(() => {});
+});
+$("next-btn").addEventListener("click", () => {
+  apiLocal("/api/next-word").then(applyServerState).catch(() => {});
+});
+$("undo-btn").addEventListener("click", () => {
+  apiLocal("/api/undo-rejection").then(applyServerState).catch(() => {});
+});
+
+function typingInField() {
+  const tag = (document.activeElement && document.activeElement.tagName) || "";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+document.addEventListener("keydown", (e) => {
+  if (typingInField() || $("cell-dialog").open) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (key === "x") { e.preventDefault(); $("reject-btn").click(); }
+  else if (key === "n") { e.preventDefault(); $("next-btn").click(); }
+  else if (key === "z") { e.preventDefault(); $("undo-btn").click(); }
+});
 
 let dragDepth = 0;
 document.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; $("drop-overlay").hidden = false; });
