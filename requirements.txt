@@ -1,0 +1,16 @@
+# Phase 1 (word solver) uses only the standard library.
+# Phase 2 (screenshot recognition):
+opencv-python>=4.8
+numpy>=1.26
+# Only needed to regenerate font-rendered templates (python -m word_solver.vision.templates synthetic).
+pillow>=10.0
+# Phase 3 (local web interface):
+fastapi>=0.110
+uvicorn>=0.27
+python-multipart>=0.0.9
+# Web API tests (python -m unittest):
+httpx>=0.27
+# Phase 4 (USB iPhone screenshots, read-only):
+pymobiledevice3>=11.0
+# On Python 3.14, pymobiledevice3's pyimg4 extra needs Microsoft C++ Build Tools
+# to compile pylzss. Screenshot capture itself does not import pyimg4.

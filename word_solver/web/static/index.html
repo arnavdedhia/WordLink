@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Word Link Solver</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="toolbar">
+    <h1>Word Link Solver</h1>
+    <div class="actions">
+      <label class="button primary">
+        Choose screenshot
+        <input id="file-input" type="file" accept="image/*" hidden>
+      </label>
+      <button id="edit-toggle" class="button" type="button" aria-pressed="false">Edit letters</button>
+      <button id="type-toggle" class="button" type="button">Type board</button>
+      <button id="iphone-toggle" class="button" type="button">Watch iPhone</button>
+      <label class="check"><input id="debug-check" type="checkbox"> Debug timings</label>
+    </div>
+  </header>
+
+  <div id="capture-bar" class="capture-bar">
+    <span id="capture-dot" class="dot off" aria-hidden="true"></span>
+    <span id="capture-text">iPhone: not watching</span>
+    <span id="stale-tag" class="tag stale" hidden>STALE</span>
+    <span id="capture-metrics" class="capture-metrics" hidden></span>
+  </div>
+
+  <form id="type-form" class="type-form" hidden>
+    <label for="type-input">Board rows</label>
+    <input id="type-input" type="text" placeholder="OSYE YYEM OTPE FUND" autocomplete="off" spellcheck="false">
+    <button class="button primary" type="submit">Solve</button>
+  </form>
+
+  <div id="error" class="error" hidden></div>
+
+  <main id="empty" class="empty">
+    <p>Choose a screenshot to start.</p>
+    <p class="hint">You can also drag a screenshot onto this page, paste one with Ctrl+V, or type a board.</p>
+    <p class="hint">Test image: word_solver\vision\samples\board_osye.jpg</p>
+  </main>
+
+  <main id="content" class="content" hidden>
+    <section class="left">
+      <div id="warning" class="warning" hidden></div>
+
+      <div id="hero" class="hero">
+        <div class="hero-row">
+          <span id="hero-label" class="hero-label">BEST WORD:</span>
+          <span id="hero-word" class="hero-word"></span>
+          <span id="unverified-tag" class="tag" hidden>UNVERIFIED</span>
+        </div>
+        <div class="hero-row small">
+          <span class="hero-label">LENGTH:</span>
+          <span id="hero-length" class="hero-length"></span>
+          <span id="hero-tied" class="muted" hidden></span>
+          <button id="back-to-best" class="link" type="button" hidden>Back to best word</button>
+        </div>
+      </div>
+
+      <div id="board" class="board" aria-label="Board">
+        <div id="tile-layer" class="layer"></div>
+        <svg id="path-layer" class="layer" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div id="label-layer" class="layer labels"></div>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch start"></i>Start</span>
+        <span><i class="swatch mid"></i>Next tiles</span>
+        <span><i class="swatch end"></i>End</span>
+        <span id="edit-hint" class="edit-hint" hidden>Edit mode: tap a tile to change its letter</span>
+      </div>
+
+      <h2>Next best words</h2>
+      <ol id="word-list" class="word-list"></ol>
+      <p id="no-words" class="muted" hidden></p>
+    </section>
+
+    <section class="right">
+      <h2>Board status</h2>
+      <div id="mini-board" class="mini-board"></div>
+      <dl class="stats">
+        <dt>Lowest confidence</dt><dd id="stat-confidence"></dd>
+        <dt>Last board update</dt><dd id="stat-updated"></dd>
+        <dt>Solver time</dt><dd id="stat-solve"></dd>
+        <dt>Recognition time</dt><dd id="stat-recognize"></dd>
+        <dt>Screenshot time</dt><dd id="stat-capture"></dd>
+        <dt>Total update</dt><dd id="stat-total-ms"></dd>
+        <dt>Valid words</dt><dd id="stat-total"></dd>
+        <dt>Board source</dt><dd id="stat-source"></dd>
+      </dl>
+    </section>
+  </main>
+
+  <dialog id="cell-dialog" class="cell-dialog">
+    <form method="dialog" id="cell-form">
+      <h2 id="cell-title"></h2>
+      <p id="cell-detail" class="muted"></p>
+      <input id="cell-input" type="text" maxlength="1" autocomplete="off" spellcheck="false" aria-label="New letter">
+      <p class="muted">Type the correct letter.</p>
+      <div class="dialog-actions">
+        <button id="cell-keep" class="button" type="button">Keep letter</button>
+        <button class="button" value="cancel" type="submit">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="drop-overlay" class="drop-overlay" hidden>Drop screenshot to solve</div>
+  <div id="busy" class="busy" hidden>Working...</div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

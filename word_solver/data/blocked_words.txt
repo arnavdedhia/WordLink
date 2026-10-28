@@ -1,0 +1,3 @@
+# Words in words.txt that the game rejects.
+# One word per line. Lines starting with # are ignored.
+# Add from the command line with: python -m word_solver --block WORD
