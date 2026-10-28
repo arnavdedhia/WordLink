@@ -108,7 +108,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="With --image: save intermediate images to word_solver/vision/debug/.",
+        help="Print solver timings and DFS counters. With --image, also save vision debug images.",
     )
     parser.add_argument(
         "--accept-uncertain",
@@ -149,11 +149,17 @@ def main(argv: list[str] | None = None, config: SolverConfig = DEFAULT_CONFIG) -
 
     load_start = time.perf_counter()
     dictionary = WordDictionary.from_config(config)
+    dict_ms = (time.perf_counter() - load_start) * 1000
+    trie_start = time.perf_counter()
     trie = dictionary.build_trie(config.min_word_length, config.max_word_length)
-    load_ms = (time.perf_counter() - load_start) * 1000
-    print(f"Loaded {len(trie):,} dictionary words in {load_ms:.0f} ms.")
+    trie_ms = (time.perf_counter() - trie_start) * 1000
+    print(f"Loaded {len(trie):,} dictionary words in {dict_ms + trie_ms:.0f} ms.")
 
     result = Solver(trie, config).solve(board)
+    result.stats.dictionary_load_ms = dict_ms
+    result.stats.trie_build_ms = trie_ms
+    if args.debug:
+        result.stats.print()
     print_report(board, result, config)
 
 

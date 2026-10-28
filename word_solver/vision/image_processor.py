@@ -59,6 +59,7 @@ class IsolatedCharacter:
 
     mask: np.ndarray  # letter pixels only, cropped to their bounding box
     bbox: tuple[int, int, int, int] | None  # (x, y, w, h) within the input crop
+    component_count: int = 0  # 2 usually means a Qu tile (Q plus a small u)
 
 
 def isolate_character(mask: np.ndarray, min_blob_fraction: float = 0.15) -> IsolatedCharacter:
@@ -68,6 +69,9 @@ def isolate_character(mask: np.ndarray, min_blob_fraction: float = 0.15) -> Isol
     the gap between tiles). Of the rest, anything much smaller than the
     largest component is discarded, which removes the small dots under the
     letter if any part of them falls inside the crop.
+
+    The only two-letter tile is Qu: a smaller blob sitting to the right of the
+    main blob is kept even when it is below ``min_blob_fraction``.
     """
     h, w = mask.shape
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
@@ -79,18 +83,44 @@ def isolate_character(mask: np.ndarray, min_blob_fraction: float = 0.15) -> Isol
             candidates.append((label, int(area)))
 
     if not candidates:
-        return IsolatedCharacter(mask=np.zeros((0, 0), np.uint8), bbox=None)
+        return IsolatedCharacter(mask=np.zeros((0, 0), np.uint8), bbox=None, component_count=0)
 
-    largest = max(area for _, area in candidates)
-    keep = [label for label, area in candidates if area >= largest * min_blob_fraction]
+    largest_label, largest_area = max(candidates, key=lambda item: item[1])
+    keep = [label for label, area in candidates if area >= largest_area * min_blob_fraction]
+    if largest_label not in keep:
+        keep.append(largest_label)
+
+    companion = _qu_companion_label(candidates, stats, largest_label, largest_area)
+    if companion is not None and companion not in keep:
+        keep.append(companion)
+
     letter = np.isin(labels, keep).astype(np.uint8) * 255
-
     ys, xs = np.nonzero(letter)
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
     return IsolatedCharacter(
         mask=letter[y0:y1, x0:x1],
         bbox=(int(x0), int(y0), int(x1 - x0), int(y1 - y0)),
+        component_count=len(keep),
     )
+
+
+def _qu_companion_label(candidates, stats, largest_label: int, largest_area: int) -> int | None:
+    """Return the label of a small blob to the right of the main letter (the u in Qu)."""
+    lx, ly, lw, lh, _ = stats[largest_label]
+    main_cx = lx + lw / 2.0
+    best = None
+    best_area = 0
+    for label, area in candidates:
+        if label == largest_label or area < largest_area * 0.05:
+            continue
+        x, y, bw, bh, _ = stats[label]
+        cx = x + bw / 2.0
+        to_the_right = cx > main_cx and (x + bw) > lx + lw * 0.4
+        overlaps_vertically = y < ly + lh and y + bh > ly
+        below_the_letter = y >= ly + lh * 0.85
+        if to_the_right and overlaps_vertically and not below_the_letter and area > best_area:
+            best, best_area = label, area
+    return best
 
 
 def normalize_glyph(letter_mask: np.ndarray, size: int = DEFAULT_VISION_CONFIG.glyph_size) -> np.ndarray:

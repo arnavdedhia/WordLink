@@ -101,7 +101,10 @@ def read_board(
     if recognizer is None:
         recognizer = TemplateMatchRecognizer(TemplateLibrary.load(config), config)
     extraction = extract_cells(image, config)
-    readings = [CellReading(c, recognizer.recognize(c.glyph)) for c in extraction.cells]
+    readings = [
+        CellReading(c, recognizer.recognize(c.glyph, c.isolated.component_count))
+        for c in extraction.cells
+    ]
     return BoardReading(
         image=image,
         region=extraction.region,

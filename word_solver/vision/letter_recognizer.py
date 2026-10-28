@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 from word_solver.vision.config import DEFAULT_VISION_CONFIG, VisionConfig
-from word_solver.vision.templates import TemplateLibrary
+from word_solver.vision.templates import QU_TILE, TemplateLibrary
 
 UNKNOWN = "?"
 
@@ -32,8 +32,12 @@ class Recognition:
 
 class LetterRecognizer(ABC):
     @abstractmethod
-    def recognize(self, glyph: np.ndarray) -> Recognition:
-        """Classify one normalized glyph (see ``image_processor.normalize_glyph``)."""
+    def recognize(self, glyph: np.ndarray, component_count: int = 1) -> Recognition:
+        """Classify one normalized glyph (see ``image_processor.normalize_glyph``).
+
+        ``component_count`` is the number of ink blobs in the tile. Two blobs
+        means this is the Qu tile (the only two-letter square).
+        """
 
 
 class TemplateMatchRecognizer(LetterRecognizer):
@@ -77,12 +81,13 @@ class TemplateMatchRecognizer(LetterRecognizer):
             scores[letter] = (best, best_source)
         return scores
 
-    def recognize(self, glyph: np.ndarray) -> Recognition:
+    def recognize(self, glyph: np.ndarray, component_count: int = 1) -> Recognition:
         if not glyph.any():
             return Recognition(UNKNOWN, 0.0, None, 0.0, None, True, "no letter found in tile")
 
         ranked = sorted(self.score_letters(glyph).items(), key=lambda kv: kv[1][0], reverse=True)
         letter, (score, source) = ranked[0]
+        letter, score, source, ranked = self._prefer_qu(ranked, component_count)
         confidence = max(0.0, min(1.0, score))
         runner_up, runner_score = (ranked[1][0], max(0.0, ranked[1][1][0])) if len(ranked) > 1 else (None, 0.0)
         margin = confidence - runner_score
@@ -101,3 +106,24 @@ class TemplateMatchRecognizer(LetterRecognizer):
             flagged=bool(reasons),
             reason="; ".join(reasons) or None,
         )
+
+    def _prefer_qu(self, ranked, component_count: int):
+        """Qu is the only two-letter tile and is often confused with W."""
+        scores = {letter: (score, source) for letter, (score, source) in ranked}
+        if QU_TILE not in scores:
+            letter, (score, source) = ranked[0]
+            return letter, score, source, ranked
+
+        qu_score, qu_source = scores[QU_TILE]
+        best_letter, (best_score, best_source) = ranked[0]
+        choose_qu = False
+        if component_count >= 2 and qu_score >= 0.35:
+            choose_qu = True
+        elif best_letter == "W" and qu_score >= best_score - 0.12 and qu_score >= 0.50:
+            choose_qu = True
+        if not choose_qu:
+            return best_letter, best_score, best_source, ranked
+
+        rest = [(letter, val) for letter, val in ranked if letter != QU_TILE]
+        new_ranked = [(QU_TILE, (qu_score, qu_source)), *rest]
+        return QU_TILE, qu_score, qu_source, new_ranked

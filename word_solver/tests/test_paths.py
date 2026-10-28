@@ -37,6 +37,14 @@ class TestCoordinatePaths(unittest.TestCase):
         board = [list("ZZZZ"), list("ZZZZ"), list("ZZZZ"), list("ZCAT")]
         self.assertEqual(found_words(solve(board, ["CAT"]))["CAT"], [[3, 1], [3, 2], [3, 3]])
 
+    def test_qu_tile_counts_as_q_then_u(self):
+        board = [["QU", "I", "Z", "Z"], ["Z", "Z", "Z", "Z"], ["Z", "Z", "Z", "Z"], ["Z", "Z", "Z", "Z"]]
+        result = solve(board, ["QUIZ", "QU"])
+        self.assertIn("QUIZ", found_words(result))
+        path = found_words(result)["QUIZ"]
+        self.assertEqual("".join(board[r][c] for r, c in path), "QUIZ")
+        self.assertEqual(len(path), 3)
+
     def test_lowercase_board_is_accepted(self):
         board = [[t.lower() for t in row] for row in DEFAULT_BOARD]
         self.assertIn("FOUND", found_words(solve(board, ["FOUND"])))
@@ -87,6 +95,14 @@ class TestSampleBoardWithRealDictionary(unittest.TestCase):
 
     def test_solves_quickly(self):
         self.assertLess(self.result.elapsed_seconds, 1.0)
+
+    def test_search_stats_are_recorded(self):
+        stats = self.result.stats
+        self.assertGreater(stats.states_visited, 0)
+        self.assertGreater(stats.trie_pruned, 0)
+        self.assertEqual(stats.words_found, self.result.total)
+        self.assertGreater(stats.search_ms, 0)
+        self.assertGreaterEqual(stats.rank_ms, 0)
 
 
 if __name__ == "__main__":

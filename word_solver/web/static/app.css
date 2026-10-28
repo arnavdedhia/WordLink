@@ -198,6 +198,7 @@ body {
 }
 .label.unused { color: #4b5563; }
 .label.flagged { color: #b91c1c; }
+.label.wide { font-size: clamp(22px, 5.5vw, 48px); letter-spacing: 0; }
 
 .badge {
   position: absolute;

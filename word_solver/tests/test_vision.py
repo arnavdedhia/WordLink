@@ -117,6 +117,14 @@ class TestLetterIsolation(unittest.TestCase):
         isolated = isolate_character(mask, min_blob_fraction=0.15)
         self.assertEqual(isolated.bbox, (25, 10, 7, 30))
 
+    def test_keeps_small_u_to_the_right_of_q(self):
+        mask = np.zeros((60, 80), np.uint8)
+        mask[10:45, 10:40] = 255  # Q body
+        mask[24:32, 50:58] = 255  # u to the right, smaller than 15% of Q
+        isolated = isolate_character(mask, min_blob_fraction=0.15)
+        self.assertEqual(isolated.component_count, 2)
+        self.assertGreater(isolated.bbox[2], 40)
+
     def test_empty_crop(self):
         isolated = isolate_character(np.zeros((40, 40), np.uint8))
         self.assertIsNone(isolated.bbox)
@@ -173,11 +181,19 @@ class TestTemplateLibrary(unittest.TestCase):
             config = replace(DEFAULT_VISION_CONFIG, templates_dir=Path(tmp))
             glyph = np.zeros((32, 32), np.uint8)
             glyph[8:24, 14:18] = 255
-            path = save_sample("q", glyph, "test", config)
+            path = save_sample("Q", glyph, "test", config)
             self.assertEqual(path, Path(tmp) / "samples" / "Q" / "test.png")
             loaded = TemplateLibrary.load(config)
             self.assertEqual(loaded.letters_with_samples(), {"Q"})
             np.testing.assert_array_equal(loaded.by_letter["Q"][0].image, glyph)
+
+    def test_save_qu_sample_uses_qu_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = replace(DEFAULT_VISION_CONFIG, templates_dir=Path(tmp))
+            glyph = np.zeros((32, 32), np.uint8)
+            glyph[8:24, 6:26] = 255
+            path = save_sample("q", glyph, "test", config)
+            self.assertEqual(path, Path(tmp) / "samples" / "QU" / "test.png")
 
     def test_refuses_empty_or_invalid_samples(self):
         with self.assertRaises(ValueError):
@@ -188,6 +204,7 @@ class TestTemplateLibrary(unittest.TestCase):
     def test_parse_labels(self):
         self.assertEqual(parse_labels("osye,yyem otpe FUND", 4, 4), EXPECTED)
         self.assertEqual(parse_labels("A... .... .... ....", 4, 4)[0], ["A", ".", ".", "."])
+        self.assertEqual(parse_labels("OSqE YYYY YYYY YYYY", 4, 4)[0], ["O", "S", "QU", "E"])
         with self.assertRaises(ValueError):
             parse_labels("OSY YYEM OTPE FUND", 4, 4)
 
@@ -203,6 +220,31 @@ class TestDebugOutput(unittest.TestCase):
             self.assertEqual(len(list((run / "tiles").glob("*_tile.png"))), 16)
             self.assertEqual(len(list((run / "letters").glob("*_glyph.png"))), 16)
             self.assertIn("O S Y E", (run / "recognition.txt").read_text(encoding="utf-8"))
+
+
+@unittest.skipIf(cv2 is None, "OpenCV not installed")
+class TestQuTile(unittest.TestCase):
+    def test_rendered_qu_is_not_read_as_w(self):
+        from word_solver.vision.templates import render_font_glyph
+
+        font = Path("C:/Windows/Fonts/arialbd.ttf")
+        if not font.exists():
+            self.skipTest("Arial Bold is not installed")
+        recognizer = TemplateMatchRecognizer(TemplateLibrary.load())
+        qu = render_font_glyph("QU", font)
+        rec = recognizer.recognize(qu, component_count=2)
+        self.assertEqual(rec.letter, "QU")
+        w = render_font_glyph("W", font)
+        rec_w = recognizer.recognize(w, component_count=1)
+        self.assertEqual(rec_w.letter, "W")
+
+    def test_two_blobs_select_qu_even_if_w_scores_well(self):
+        recognizer = TemplateMatchRecognizer(TemplateLibrary.load())
+        if "QU" not in recognizer.templates:
+            self.skipTest("No QU templates")
+        qu_image = recognizer.templates["QU"][0][0]
+        rec = recognizer.recognize(qu_image.astype(np.uint8), component_count=2)
+        self.assertEqual(rec.letter, "QU")
 
 
 @unittest.skipIf(cv2 is None, "OpenCV not installed")

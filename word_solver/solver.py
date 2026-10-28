@@ -46,12 +46,38 @@ class WordResult:
 
 
 @dataclass
+class SearchStats:
+    """Timings and counters for one solve. Dictionary/Trie times are filled by the caller."""
+
+    dictionary_load_ms: float = 0.0
+    trie_build_ms: float = 0.0
+    search_ms: float = 0.0
+    rank_ms: float = 0.0
+    total_ms: float = 0.0
+    states_visited: int = 0
+    trie_pruned: int = 0
+    words_found: int = 0
+
+    def print(self) -> None:
+        print("Solver measurements", flush=True)
+        print(f"  Dictionary loading:     {self.dictionary_load_ms:.1f} ms", flush=True)
+        print(f"  Trie construction:      {self.trie_build_ms:.1f} ms", flush=True)
+        print(f"  Board search:           {self.search_ms:.1f} ms", flush=True)
+        print(f"  Candidate ranking:      {self.rank_ms:.1f} ms", flush=True)
+        print(f"  Total solver execution: {self.total_ms:.1f} ms", flush=True)
+        print(f"  DFS states visited:     {self.states_visited:,}", flush=True)
+        print(f"  Trie-pruned branches:   {self.trie_pruned:,}", flush=True)
+        print(f"  Valid words discovered: {self.words_found:,}", flush=True)
+
+
+@dataclass
 class SolveResult:
     """Everything found on a board, ranked best first."""
 
     words: list[WordResult]
     elapsed_seconds: float
     best_words: list[WordResult] = field(default_factory=list)
+    stats: SearchStats = field(default_factory=SearchStats)
 
     @property
     def total(self) -> int:
@@ -127,8 +153,8 @@ class Solver:
         self.config = config
         self._neighbors = build_neighbors(config.rows, config.cols, config.neighbor_offsets)
 
-    def solve(self, board: Board) -> SolveResult:
-        start = time.perf_counter()
+    def solve(self, board: Board, debug: bool = False) -> SolveResult:
+        total_start = time.perf_counter()
         grid = normalize_board(board, self.config)
         cols = self.config.cols
         tiles = [tile for row in grid for tile in row]
@@ -141,8 +167,14 @@ class Solver:
 
         # path holds cell indexes; `visited` is a bitmask of cells used in the path.
         path: list[int] = []
+        states_visited = 0
+        trie_pruned = 0
+
+        search_start = time.perf_counter()
 
         def dfs(cell: int, node: TrieNode, word: str, visited: int) -> None:
+            nonlocal states_visited, trie_pruned
+            states_visited += 1
             path.append(cell)
             if node.is_word and len(word) >= min_len and word not in found:
                 found[word] = WordResult.make(word, [[i // cols, i % cols] for i in path])
@@ -153,15 +185,31 @@ class Solver:
                         continue
                     child = _advance(node, tiles[nxt])
                     if child is None:
+                        trie_pruned += 1
                         continue  # Trie pruning: no word has this prefix.
                     dfs(nxt, child, word + tiles[nxt], visited | bit)
             path.pop()
 
         for cell, tile in enumerate(tiles):
             node = _advance(self.trie.root, tile)
-            if node is not None:
-                dfs(cell, node, tile, 1 << cell)
+            if node is None:
+                trie_pruned += 1
+                continue
+            dfs(cell, node, tile, 1 << cell)
 
+        search_ms = (time.perf_counter() - search_start) * 1000
+        rank_start = time.perf_counter()
         ranked = sorted(found.values(), key=rank_key)
-        elapsed = time.perf_counter() - start
-        return SolveResult(words=ranked, elapsed_seconds=elapsed, best_words=select_best(ranked))
+        rank_ms = (time.perf_counter() - rank_start) * 1000
+        elapsed = time.perf_counter() - total_start
+        stats = SearchStats(
+            search_ms=search_ms,
+            rank_ms=rank_ms,
+            total_ms=elapsed * 1000,
+            states_visited=states_visited,
+            trie_pruned=trie_pruned,
+            words_found=len(found),
+        )
+        if debug:
+            stats.print()
+        return SolveResult(words=ranked, elapsed_seconds=elapsed, best_words=select_best(ranked), stats=stats)

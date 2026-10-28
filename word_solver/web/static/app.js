@@ -201,9 +201,9 @@ function renderBoard(current) {
       tiles.appendChild(tile);
 
       const label = document.createElement("div");
-      label.className = ["label", ...cls].join(" ");
+      label.className = ["label", ...cls, cell.letter === "QU" ? "wide" : ""].filter(Boolean).join(" ");
       Object.assign(label.style, pos);
-      label.textContent = cell.letter;
+      label.textContent = displayTile(cell.letter);
       const step = order.get(`${r},${c}`);
       if (step !== undefined) {
         const badge = document.createElement("span");
@@ -266,7 +266,7 @@ function renderStatus() {
     div.className = "mini-cell" + (cell.flagged ? " flagged" : cell.source === "manual" ? " manual" : "");
     const conf = cell.source === "manual" ? "manual" : cell.confidence == null ? "-" : pct(cell.confidence);
     div.innerHTML = `<span class="l"></span><span class="c">${conf}</span>`;
-    div.querySelector(".l").textContent = cell.letter;
+    div.querySelector(".l").textContent = displayTile(cell.letter);
     div.title = cell.reason || (cell.runner_up ? `runner-up: ${cell.runner_up}` : "");
     mini.appendChild(div);
   }));
@@ -318,10 +318,24 @@ function onTileClick(r, c) {
   input.focus();
 }
 
+function displayTile(letter) {
+  return letter === "QU" ? "Qu" : letter;
+}
+
 $("cell-input").addEventListener("input", (e) => {
-  const letter = e.target.value.replace(/[^a-z]/gi, "").toUpperCase();
+  const raw = e.target.value.replace(/[^a-z]/gi, "");
+  if (raw === "q") {
+    e.target.value = "Qu";
+    if (editingCell) {
+      $("cell-dialog").close();
+      setCell(editingCell[0], editingCell[1], "QU");
+    }
+    return;
+  }
+  const letter = raw.toUpperCase();
   e.target.value = letter;
-  if (letter && editingCell) {
+  if (!editingCell) return;
+  if (letter === "QU" || (letter.length === 1 && letter !== "Q")) {
     $("cell-dialog").close();
     setCell(editingCell[0], editingCell[1], letter);
   }

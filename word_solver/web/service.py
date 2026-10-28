@@ -85,11 +85,12 @@ class BoardService:
         self.vision_config = vision_config  # None means the vision package defaults
         self.top_n = top_n
         load_start = time.perf_counter()
-        trie = WordDictionary.from_config(solver_config).build_trie(
-            solver_config.min_word_length, solver_config.max_word_length
-        )
-        self.dictionary_size = len(trie)
+        dictionary = WordDictionary.from_config(solver_config)
         self.dictionary_load_ms = (time.perf_counter() - load_start) * 1000
+        trie_start = time.perf_counter()
+        trie = dictionary.build_trie(solver_config.min_word_length, solver_config.max_word_length)
+        self.trie_build_ms = (time.perf_counter() - trie_start) * 1000
+        self.dictionary_size = len(trie)
         self.solver = Solver(trie, solver_config)
         self.blocked = BlockedWordList(solver_config.blocked_words_path)
         self._rejection_stack: list[str] = []
@@ -155,7 +156,7 @@ class BoardService:
         info = RecognitionInfo(image_name, reading.region.method, debug_dir, recognize_ms)
         state = BoardState(cells, origin, now, recognized_at=now, recognition=info)
         solve_start = time.perf_counter()
-        self._solve(state)
+        self._solve(state, debug=debug)
         solve_ms = (time.perf_counter() - solve_start) * 1000
         if state.solve is not None:
             solve_ms = state.solve.elapsed_seconds * 1000
@@ -267,10 +268,12 @@ class BoardService:
     # ----- internals -----------------------------------------------------
 
     def _clean_letter(self, letter: str) -> str:
-        word = normalize_word(letter)
-        if word is None or len(word) != 1:
-            raise ValueError(f"A tile must be a single letter A-Z, got {letter!r}.")
-        return word
+        from word_solver.vision.templates import normalize_tile_label
+
+        tile = normalize_tile_label(letter)
+        if tile is None:
+            raise ValueError(f"A tile must be a letter A-Z or Qu, got {letter!r}.")
+        return tile
 
     def _require_state(self) -> BoardState:
         if self._state is None:
@@ -295,19 +298,28 @@ class BoardService:
             self._update_seq += 1
             return self._snapshot(state)
 
-    def _solve(self, state: BoardState) -> None:
+    def _solve(self, state: BoardState, debug: bool = False) -> None:
         unknown = [[r, c] for r, row in enumerate(state.cells) for c, cell in enumerate(row) if cell.letter == UNKNOWN]
         if unknown:
             state.solve = None
             state.solve_error = "Some tiles could not be read. Set their letters to solve the board."
             return
         result = self.solver.solve(state.board)
+        result.stats.dictionary_load_ms = self.dictionary_load_ms
+        result.stats.trie_build_ms = self.trie_build_ms
         state.solve = self._filter_blocked(result)
         state.solve_error = None
+        if debug:
+            result.stats.print()
 
     def _filter_blocked(self, result: SolveResult) -> SolveResult:
         words = [w for w in result.words if w.word not in self.blocked.words]
-        return SolveResult(words=words, elapsed_seconds=result.elapsed_seconds, best_words=select_best(words))
+        return SolveResult(
+            words=words,
+            elapsed_seconds=result.elapsed_seconds,
+            best_words=select_best(words),
+            stats=result.stats,
+        )
 
     def _advance_index(self, state: BoardState, start: int) -> int:
         """First index at or after ``start`` whose word is not blocked. Clamps at last item."""

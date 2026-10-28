@@ -43,8 +43,23 @@ from word_solver.vision.image_processor import (
 )
 
 LETTERS = string.ascii_uppercase
+QU_TILE = "QU"
+TILES = (*LETTERS, QU_TILE)
 SAMPLE = "sample"
 SYNTHETIC = "synthetic"
+
+
+def normalize_tile_label(raw: str) -> str | None:
+    """Map a typed/labeled cell to A-Z or QU. ``q`` means the Qu tile; ``Q`` is the letter Q."""
+    stripped = raw.strip()
+    if stripped == "q":
+        return QU_TILE
+    upper = stripped.upper().replace(" ", "")
+    if upper == QU_TILE:
+        return QU_TILE
+    if len(upper) == 1 and upper in LETTERS:
+        return upper
+    return None
 # Windows fonts whose combined shapes best matched the game's letters on the
 # reference screenshot. Missing fonts are skipped.
 DEFAULT_SYNTHETIC_FONTS = (
@@ -93,12 +108,12 @@ class TemplateLibrary:
         root = config.templates_dir
         for path in sorted((root / "samples").glob("*/*.png")):
             letter = path.parent.name.upper()
-            if letter in LETTERS:
+            if letter in TILES:
                 library.add(Template(letter, _load_glyph(path, config), SAMPLE, path))
         if include_synthetic:
             for path in sorted((root / "synthetic").glob("*/*.png")):
                 letter = path.parent.name.upper()
-                if letter in LETTERS:
+                if letter in TILES:
                     library.add(Template(letter, _load_glyph(path, config), SYNTHETIC, path))
         return library
 
@@ -112,9 +127,10 @@ def _load_glyph(path: Path, config: VisionConfig) -> np.ndarray:
 
 def save_sample(letter: str, glyph: np.ndarray, name: str, config: VisionConfig = DEFAULT_VISION_CONFIG) -> Path:
     """Store a labeled glyph as a real sample. Returns the file path."""
-    letter = letter.upper()
-    if letter not in LETTERS:
-        raise ValueError(f"Not a letter A-Z: {letter!r}")
+    original = letter
+    letter = normalize_tile_label(letter)
+    if letter is None:
+        raise ValueError(f"Not a tile A-Z or Qu: {original!r}")
     if not glyph.any():
         raise ValueError(f"Refusing to save an empty glyph for {letter}.")
     path = config.templates_dir / "samples" / letter / f"{name}.png"
@@ -126,9 +142,12 @@ def render_font_glyph(letter: str, font_path: Path, config: VisionConfig = DEFAU
     """Render ``letter`` with a TrueType font and normalize it like a screenshot glyph."""
     from PIL import Image, ImageDraw, ImageFont
 
+    tile = normalize_tile_label(letter) or letter
+    text = "Qu" if tile == QU_TILE else tile
     font = ImageFont.truetype(str(font_path), 160)
-    canvas = Image.new("L", (240, 240), 255)
-    ImageDraw.Draw(canvas).text((40, 20), letter, font=font, fill=0)
+    canvas_size = (360, 240) if tile == QU_TILE else (240, 240)
+    canvas = Image.new("L", canvas_size, 255)
+    ImageDraw.Draw(canvas).text((20, 20) if tile == QU_TILE else (40, 20), text, font=font, fill=0)
     mask = binarize_dark_ink(np.array(canvas), threshold=128)
     isolated = isolate_character(mask, min_blob_fraction=0.0)
     return normalize_glyph(isolated.mask, config.glyph_size)
@@ -147,7 +166,7 @@ def generate_synthetic(
         old.unlink()
     paths = []
     for font in fonts:
-        for letter in LETTERS:
+        for letter in TILES:
             path = synthetic_dir / letter / f"{font.stem.lower()}.png"
             save_image(path, render_font_glyph(letter, font, config))
             paths.append(path)
@@ -159,11 +178,18 @@ def parse_labels(text: str, rows: int, cols: int) -> list[list[str]]:
     parts = text.replace(",", " ").split()
     if len(parts) != rows or any(len(p) != cols for p in parts):
         raise ValueError(f"Labels must be {rows} rows of {cols} characters, e.g. 'OSYE YYEM OTPE FUND'.")
-    grid = [list(p.upper()) for p in parts]
-    for row in grid:
-        for ch in row:
-            if ch != "." and ch not in LETTERS:
-                raise ValueError(f"Invalid label {ch!r}; use A-Z or '.'.")
+    grid: list[list[str]] = []
+    for part in parts:
+        row = []
+        for ch in part:
+            if ch == ".":
+                row.append(".")
+                continue
+            tile = normalize_tile_label(ch)
+            if tile is None:
+                raise ValueError(f"Invalid label {ch!r}; use A-Z, q for Qu, or '.'.")
+            row.append(tile)
+        grid.append(row)
     return grid
 
 
@@ -207,7 +233,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         library = TemplateLibrary.load()
         sampled = library.letters_with_samples()
-        for letter in LETTERS:
+        for letter in TILES:
             templates = library.by_letter.get(letter, [])
             n_samples = sum(t.source == SAMPLE for t in templates)
             status = f"{n_samples} sample(s)" if letter in sampled else ("synthetic only" if templates else "MISSING")

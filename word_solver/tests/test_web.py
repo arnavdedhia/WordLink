@@ -68,9 +68,8 @@ class TestWebApi(unittest.TestCase):
     def test_paths_match_solver_format(self):
         state = self.client.post("/api/board", json={"rows": ["OSYE", "YYEM", "OTPE", "FUND"]}).json()
         for word in state["solve"]["words"]:
-            self.assertEqual(len(word["path"]), word["length"])
-            for r, c in word["path"]:
-                self.assertEqual(state["board"][r][c], word["word"][word["path"].index([r, c])])
+            spelled = "".join(state["board"][r][c] for r, c in word["path"])
+            self.assertEqual(spelled, word["word"])
 
     def test_manual_board(self):
         state = self.client.post("/api/board", json={"rows": ["osye", "yyem", "otpe", "fund"]}).json()
