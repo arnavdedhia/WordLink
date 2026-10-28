@@ -2,7 +2,13 @@
 
 The final word set is::
 
-    (base word list + allowed_words.txt) - blocked_words.txt
+    (triumph_words.txt + allowed_words.txt) - blocked_words.txt
+
+``triumph_words.txt`` is a frequency-filtered ENABLE1 subset built offline by
+``scripts/build_dictionary.py``. The app never loads ENABLE1 or frequency data.
+
+Words confirmed in-game go in ``allowed_words.txt`` and are always accepted.
+Words the game rejects go in ``blocked_words.txt`` and are never recommended.
 
 To use a different base dictionary, point ``SolverConfig.words_path`` at
 another file with one word per line, or build a ``WordDictionary`` directly

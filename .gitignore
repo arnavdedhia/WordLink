@@ -42,3 +42,6 @@ word_solver/capture/captures/*
 # Vision debug dumps from --debug / Debug timings (folder kept by nested .gitignore)
 word_solver/vision/debug/*
 !word_solver/vision/debug/.gitignore
+
+# Frequency lists downloaded by scripts/build_dictionary.py
+word_solver/data/.cache/

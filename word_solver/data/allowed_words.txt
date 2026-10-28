@@ -1,3 +1,4 @@
-# Words the game accepts that are missing from words.txt.
+# Words Triumph accepts that are missing from triumph_words.txt.
+# Always kept, even if they are absent from the filtered base dictionary.
 # One word per line. Lines starting with # are ignored.
 # Add from the command line with: python -m word_solver --allow WORD

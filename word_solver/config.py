@@ -7,11 +7,21 @@ a modified copy with ``dataclasses.replace(DEFAULT_CONFIG, min_word_length=4)``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 DATA_DIR = PACKAGE_DIR / "data"
+
+# ENABLE1 source list. Used only by scripts/build_dictionary.py.
+ENABLE_WORDS_PATH = DATA_DIR / "words.txt"
+TRIUMPH_WORDS_PATH = DATA_DIR / "triumph_words.txt"
+
+# A 4x4 board has 16 tiles, so no playable word can be longer than this.
+MAX_BOARD_LETTERS = 16
+
+# Default ranked size for scripts/build_dictionary.py. Also try 50000, 75000, 100000, 125000.
+DEFAULT_DICTIONARY_SIZE = 85_000
 
 # (row_delta, col_delta) offsets for each movement style.
 ORTHOGONAL_OFFSETS: tuple[tuple[int, int], ...] = (
@@ -91,8 +101,9 @@ class SolverConfig:
     # How many ranked words to show in the report.
     top_n: int = 10
 
-    # Dictionary files.
-    words_path: Path = DATA_DIR / "words.txt"
+    # Dictionary files. The app loads triumph_words.txt, not ENABLE1.
+    # Rebuild with: python scripts/build_dictionary.py --size 85000
+    words_path: Path = DATA_DIR / "triumph_words.txt"
     allowed_words_path: Path = DATA_DIR / "allowed_words.txt"
     blocked_words_path: Path = DATA_DIR / "blocked_words.txt"
 

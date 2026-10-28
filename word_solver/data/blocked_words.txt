@@ -1,4 +1,4 @@
-# Words in words.txt that the game rejects.
+# Words Triumph rejects. Never recommended, even if they are in triumph_words.txt.
 # One word per line. Lines starting with # are ignored.
 # Add from the command line with: python -m word_solver --block WORD
 TENACE
@@ -27,3 +27,14 @@ ATWAIN
 ACINAR
 ARNICA
 RONYONS
+COALY
+LACEY
+LYCEA
+LYCEE
+AVOCET
+ROWAN
+ROWEN
+REDWING
+DYVOUR
+RAINOUT
+PARIAN
